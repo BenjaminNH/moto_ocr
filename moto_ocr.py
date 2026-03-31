@@ -259,8 +259,8 @@ def batch_process(image_folder, output_file = "result.xlsx"):
         ws.column_dimensions['H'].width = 20  # 出单点列
         
         # 统计变量
-        count_60 = 0
-        count_20 = 0
+        count_30 = 0
+        count_50 = 0
         total_commission = 0
         
         # 添加数据
@@ -270,17 +270,16 @@ def batch_process(image_folder, output_file = "result.xlsx"):
             
             # 获取当前月份的日期
             current_month = current_date.month
-            tax_amount = 3 * (13 - current_month) if current_month <= 13 else 0
+            tax_amount = 3 * (13 - current_month) if current_month <= 12 else 0
             
-            # 定义七种金额情况
+            # 定义保费金额组合
             cases = [
-                {"total": 392, "compulsory": 156, "accident": 200, "tax": 0},
-                {"total": 356, "compulsory": 156, "accident": 200, "tax": tax_amount},
-                {"total": 256, "compulsory": 156, "accident": 100, "tax": tax_amount},
-                {"total": 204, "compulsory": 104, "accident": 100, "tax": 0},
-                {"total": 304, "compulsory": 104, "accident": 200, "tax": 0},
                 {"total": 356, "compulsory": 156, "accident": 200, "tax": 0},
-                {"total": 256, "compulsory": 156, "accident": 100, "tax": 0}
+                {"total": 456, "compulsory": 156, "accident": 300, "tax": 0},
+                {"total": 304, "compulsory": 104, "accident": 200, "tax": 0},
+                {"total": 404, "compulsory": 104, "accident": 300, "tax": 0},
+                {"total": 492, "compulsory": 156, "accident": 300, "tax": 36},
+                {"total": 456, "compulsory": 156, "accident": 300, "tax": tax_amount},
             ]
             
             # 匹配金额情况
@@ -303,12 +302,12 @@ def batch_process(image_folder, output_file = "result.xlsx"):
             
             # 计算佣金
             commission = 0
-            if accident_insurance == 100:
-                commission = 5
-                count_20 += 1
-            elif accident_insurance == 200:
+            if accident_insurance == 200:
                 commission = 30
-                count_60 += 1
+                count_30 += 1
+            elif accident_insurance == 300:
+                commission = 50
+                count_50 += 1
             
             total_commission += commission
             
@@ -370,8 +369,8 @@ def batch_process(image_folder, output_file = "result.xlsx"):
         
         # 保存统计信息
         commission_stats[group_name] = {
-            "count_60": count_60,
-            "count_20": count_20,
+            "count_30": count_30,
+            "count_50": count_50,
             "total_commission": total_commission,
             "date_folder": data["date_folder"]
         }
@@ -398,38 +397,38 @@ def batch_process(image_folder, output_file = "result.xlsx"):
         if person_name not in person_date_stats[date_path]:
             person_date_stats[date_path][person_name] = {
                 "groups": [],
-                "total_count_60": 0,
-                "total_count_20": 0,
+                "total_count_30": 0,
+                "total_count_50": 0,
                 "total_commission": 0,
                 "folder_path": date_folder
             }
         
-        if stats["count_60"] > 0 or stats["count_20"] > 0:
+        if stats["count_30"] > 0 or stats["count_50"] > 0:
             group_detail = []
             commission_parts = []
-            if stats['count_60'] > 0:
-                group_detail.append(f"{stats['count_60']}单30")
-                commission_parts.append(f"{stats['count_60']}×30")
-            if stats['count_20'] > 0:
-                group_detail.append(f"{stats['count_20']}单5元")
-                commission_parts.append(f"{stats['count_20']}×5")
+            if stats['count_30'] > 0:
+                group_detail.append(f"{stats['count_30']}单30")
+                commission_parts.append(f"{stats['count_30']}×30")
+            if stats['count_50'] > 0:
+                group_detail.append(f"{stats['count_50']}单50")
+                commission_parts.append(f"{stats['count_50']}×50")
             
             # 构建群组文本
             group_text = f"{group_name} {', '.join(group_detail)}"
-            if len(commission_parts) > 1:
+            if len(commission_parts) > 0:
                 group_text += f"，{' + '.join(commission_parts)} = {stats['total_commission']}"
             group_text += f"，付{stats['total_commission']}元"
             
             person_stats = person_date_stats[date_path][person_name]
             person_stats["groups"].append(group_text)
-            person_stats["total_count_60"] += stats["count_60"]
-            person_stats["total_count_20"] += stats["count_20"]
+            person_stats["total_count_30"] += stats["count_30"]
+            person_stats["total_count_50"] += stats["count_50"]
             person_stats["total_commission"] += stats["total_commission"]
     
     # 为每个人生成结算文件
     for date_path, person_stats in person_date_stats.items():
         for person_name, stats in person_stats.items():
-            if stats["total_count_60"] > 0 or stats["total_count_20"] > 0:
+            if stats["total_count_30"] > 0 or stats["total_count_50"] > 0:
                 settlement_content = []
                 
                 # 添加每个群的统计信息
@@ -438,15 +437,15 @@ def batch_process(image_folder, output_file = "result.xlsx"):
                 # 添加总计信息
                 total_parts = []
                 commission_parts = []
-                if stats["total_count_60"] > 0:
-                    total_parts.append(f"{stats['total_count_60']}单30")
-                    commission_parts.append(f"{stats['total_count_60']}×30")
-                if stats["total_count_20"] > 0:
-                    total_parts.append(f"{stats['total_count_20']}单5元")
-                    commission_parts.append(f"{stats['total_count_20']}×5")
+                if stats["total_count_30"] > 0:
+                    total_parts.append(f"{stats['total_count_30']}单30")
+                    commission_parts.append(f"{stats['total_count_30']}×30")
+                if stats["total_count_50"] > 0:
+                    total_parts.append(f"{stats['total_count_50']}单50")
+                    commission_parts.append(f"{stats['total_count_50']}×50")
                 
                 total_text = f"总共 {', '.join(total_parts)}"
-                if len(commission_parts) > 1:
+                if len(commission_parts) > 0:
                     total_text += f"，{' + '.join(commission_parts)} = {stats['total_commission']}"
                 total_text += f"，付{stats['total_commission']}元"
                 settlement_content.append(total_text)
