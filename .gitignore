@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+结果/
+图片归档/
+*.xlsx
+*.txt
+!保费金额列举.xlsx
