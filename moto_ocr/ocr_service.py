@@ -1,7 +1,17 @@
 import re
 import base64
 import requests
-from moto_ocr.config import OCR_URLS, REQUEST_TIMEOUT
+from moto_ocr.config import API_KEY, SECRET_KEY, OCR_URLS, REQUEST_TIMEOUT
+
+_NAME_PATTERNS = [
+    re.compile(r"姓名：(\S+)"),
+    re.compile(r"姓名\s*[\n\r]*(\S+)"),
+]
+
+_AMOUNT_PATTERNS = [
+    re.compile(r"实付金额：￥(\d+(?:\.\d{2})?)"),
+    re.compile(r"实付金额\s*[\n\r]*￥(\d+(?:\.\d{2})?)"),
+]
 
 
 def get_access_token():
@@ -13,18 +23,15 @@ def get_access_token():
     url = "https://aip.baidubce.com/oauth/2.0/token"
     params = {
         "grant_type": "client_credentials",
-        "client_id": OCR_URLS[0].split("//")[1].split("/")[0] if False else None,  # placeholder
-        "client_secret": None,  # will be set by caller
+        "client_id": API_KEY,
+        "client_secret": SECRET_KEY,
     }
-    # Actually use the config values
-    from moto_ocr.config import API_KEY, SECRET_KEY
-    params["client_id"] = API_KEY
-    params["client_secret"] = SECRET_KEY
     
     try:
         response = requests.post(url, params=params, timeout=REQUEST_TIMEOUT)
         if response.status_code == 200:
-            return response.json()["access_token"]
+            data = response.json()
+            return data.get("access_token")
         else:
             print("获取access_token失败")
             return None
@@ -67,10 +74,11 @@ def ocr_image(image_path, token):
             if 'words_result' in result:
                 if isinstance(result['words_result'], list):
                     return "\n".join([item["words"] for item in result["words_result"]])
-                return "\n".join([item["words"] for item in result["words_result"].values()])
+                return "\n".join([item["words"] for item in result['words_result'].values()])
         except Exception as e:
             print(f"调用接口时发生错误：{str(e)}")
     
+    print("所有OCR接口均调用失败")
     return None
 
 
@@ -86,25 +94,15 @@ def extract_info(text):
     if not text:
         return {"姓名": "未识别到姓名", "实付金额": "未识别到金额"}
     
-    name_patterns = [
-        re.compile(r"姓名：(\S+)"),
-        re.compile(r"姓名\s*[\n\r]*(\S+)")
-    ]
-    
     name = "未识别到姓名"
-    for pattern in name_patterns:
+    for pattern in _NAME_PATTERNS:
         match = pattern.search(text)
         if match:
             name = match.group(1)
             break
     
-    amount_patterns = [
-        re.compile(r"实付金额：￥(\d+(?:\.\d{2})?)"),
-        re.compile(r"实付金额\s*[\n\r]*￥(\d+(?:\.\d{2})?)"),
-    ]
-    
     amount = "未识别到金额"
-    for pattern in amount_patterns:
+    for pattern in _AMOUNT_PATTERNS:
         match = pattern.search(text)
         if match:
             amount = match.group(1).split('.')[0]

@@ -1,6 +1,7 @@
 import os
 import datetime
 import time
+from moto_ocr.commission import match_premium
 from moto_ocr.config import LEDGER_TEMPLATE_NAME
 from moto_ocr.ocr_service import get_access_token, ocr_image, extract_info
 from moto_ocr.output_manager import (
@@ -30,12 +31,19 @@ def batch_process(image_folder):
     current_month = current_date.month
     date_str = current_date.strftime("%m月%d日")
     
-    # 遍历图片
+    ocr_failed_files = []
+    
     for root, dirs, files in os.walk(image_folder):
         for filename in files:
             if filename.lower().endswith((".png", ".jpg", ".jpeg")):
                 image_path = os.path.join(root, filename)
                 text = ocr_image(image_path, access_token)
+                
+                if text is None:
+                    ocr_failed_files.append(os.path.relpath(image_path, image_folder))
+                    print(f"  ⚠ OCR识别失败，跳过：{filename}")
+                    continue
+                
                 info = extract_info(text)
                 
                 processed_path = move_to_processed(image_path, image_folder)
@@ -47,9 +55,9 @@ def batch_process(image_folder):
                 path_parts = folder_path.split(os.sep)
                 group_name = path_parts[-1] if len(path_parts) > 2 else "默认群组"
                 
-                original_person_name = os.path.basename(os.path.dirname(os.path.dirname(image_path)))
+                person_name = os.path.basename(os.path.dirname(os.path.dirname(image_path)))
                 date_folder = os.path.join(os.path.dirname(image_folder), "结果", date_str)
-                result_folder = os.path.join(date_folder, original_person_name)
+                result_folder = os.path.join(date_folder, person_name)
                 
                 if group_name not in group_results:
                     group_results[group_name] = {
@@ -59,6 +67,11 @@ def batch_process(image_folder):
                 group_results[group_name]["results"].append(info)
                 
                 time.sleep(0.5)
+    
+    if ocr_failed_files:
+        print(f"\n⚠ 共 {len(ocr_failed_files)} 张图片OCR识别失败，未移动：")
+        for f in ocr_failed_files:
+            print(f"  - {f}")
     
     if not group_results:
         print("未找到任何图片")
@@ -86,10 +99,16 @@ def batch_process(image_folder):
         commission_stats[group_name] = stats
         
         # 同步到台账
-        from moto_ocr.commission import match_premium, calculate_commission
-        
         for result in data["results"]:
-            total_amount = int(result["实付金额"]) if result["实付金额"] != "未识别到金额" else 0
+            raw_amount = result["实付金额"]
+            if raw_amount == "未识别到金额":
+                total_amount = 0
+            else:
+                try:
+                    total_amount = int(raw_amount)
+                except ValueError:
+                    print(f"  ⚠ 金额格式异常：{raw_amount!r}，按0处理")
+                    total_amount = 0
             matched = match_premium(total_amount, month=current_month)
             
             if matched:

@@ -2,8 +2,18 @@ import os
 import shutil
 import datetime
 import openpyxl
+from moto_ocr.commission import match_premium, calculate_commission
 from moto_ocr.config import EXCEL_HEADERS, COLUMN_WIDTHS, LEDGER_TEMPLATE_NAME
 from moto_ocr.file_utils import get_unique_filename
+from moto_ocr.settlement import build_group_text, build_total_text
+
+_LEDGER_FONT = openpyxl.styles.Font(name='等线', size=20, bold=True)
+_LEDGER_BORDER = openpyxl.styles.Border(
+    left=openpyxl.styles.Side(style='thin'),
+    right=openpyxl.styles.Side(style='thin'),
+    top=openpyxl.styles.Side(style='thin'),
+    bottom=openpyxl.styles.Side(style='thin')
+)
 
 
 def move_to_processed(image_path, image_folder):
@@ -82,14 +92,6 @@ def write_to_ledger(ws, last_row, ledger_data):
     Returns:
         int: 新的行号
     """
-    font = openpyxl.styles.Font(name='等线', size=20, bold=True)
-    border = openpyxl.styles.Border(
-        left=openpyxl.styles.Side(style='thin'),
-        right=openpyxl.styles.Side(style='thin'),
-        top=openpyxl.styles.Side(style='thin'),
-        bottom=openpyxl.styles.Side(style='thin')
-    )
-    
     last_row += 1
     for col, value in enumerate(ledger_data, 1):
         cell = ws.cell(row=last_row, column=col)
@@ -98,13 +100,13 @@ def write_to_ledger(ws, last_row, ledger_data):
                 if cell.coordinate in merged_range:
                     main_cell = ws.cell(row=merged_range.min_row, column=merged_range.min_col)
                     main_cell.value = value
-                    main_cell.font = font
-                    main_cell.border = border
+                    main_cell.font = _LEDGER_FONT
+                    main_cell.border = _LEDGER_BORDER
                     break
         else:
             cell.value = value
-            cell.font = font
-            cell.border = border
+            cell.font = _LEDGER_FONT
+            cell.border = _LEDGER_BORDER
     
     return last_row
 
@@ -115,8 +117,6 @@ def create_group_excel(group_name, results, date_folder, current_date_str, month
     Returns:
         tuple: (excel_path, commission_stats)
     """
-    from moto_ocr.commission import match_premium, calculate_commission
-    
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.append(EXCEL_HEADERS)
@@ -127,17 +127,16 @@ def create_group_excel(group_name, results, date_folder, current_date_str, month
     count_30 = 0
     count_50 = 0
     total_commission = 0
-    original_person_name = ""
     
     for idx, result in enumerate(results, 1):
-        total_amount = int(result["实付金额"]) if result["实付金额"] != "未识别到金额" else 0
+        raw_amount = result["实付金额"]
+        total_amount = int(raw_amount) if raw_amount != "未识别到金额" else 0
         
         matched = match_premium(total_amount, month=month)
         if matched:
             compulsory_insurance = matched["compulsory"]
             accident_insurance = matched["accident"]
         else:
-            # 从未匹配的结果中提取人名（这里需要外部传入）
             compulsory_insurance = 0
             accident_insurance = 0
         
@@ -151,10 +150,6 @@ def create_group_excel(group_name, results, date_folder, current_date_str, month
         row_data = [idx, result["姓名"], compulsory_insurance, accident_insurance,
                     total_amount, commission, current_date_str, group_name]
         ws.append(row_data)
-        
-        # 记录未匹配的人名用于错误提示
-        if not matched:
-            original_person_name = result.get("所属文件夹", "")
     
     excel_path = os.path.join(date_folder, f"{group_name}.xlsx")
     excel_path = get_unique_filename(excel_path)
@@ -193,8 +188,6 @@ def generate_settlement_files(commission_stats):
     Args:
         commission_stats: 群组佣金统计字典
     """
-    from moto_ocr.settlement import build_group_text, build_total_text
-    
     person_date_stats = {}
     for group_name, stats in commission_stats.items():
         date_folder = stats["date_folder"]
@@ -234,5 +227,8 @@ def generate_settlement_files(commission_stats):
                 
                 settlement_file = os.path.join(stats["folder_path"], "结算.txt")
                 settlement_file = get_unique_filename(settlement_file)
-                with open(settlement_file, "w", encoding="utf-8") as f:
-                    f.write("\n".join(settlement_content))
+                try:
+                    with open(settlement_file, "w", encoding="utf-8") as f:
+                        f.write("\n".join(settlement_content))
+                except Exception as e:
+                    print(f"保存结算文件失败：{settlement_file}，错误：{e}")
