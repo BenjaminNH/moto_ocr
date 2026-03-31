@@ -130,8 +130,12 @@ def batch_process(image_folder):
         ledger_wb.save(ledger_path)
         ledger_wb.close()
         print(f"\n月度台账已更新：{ledger_path}")
+    except PermissionError:
+        print(f"\n❌ 保存台账失败：文件被占用")
+        print(f"   请关闭 Excel 中打开的台账文件：{ledger_path}")
+        print(f"   关闭后重新运行即可")
     except Exception as e:
-        print(f"保存月度台账时出错：{str(e)}")
+        print(f"\n保存月度台账时出错：{str(e)}")
     
     # 生成结算文件
     generate_settlement_files(commission_stats)
