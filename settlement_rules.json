@@ -1,0 +1,23 @@
+{
+  "accident_plans": [
+    { "amount": 200, "commission": 0 },
+    { "amount": 302, "commission": 30 },
+    { "amount": 400, "commission": 50 }
+  ],
+  "compulsory_amounts": [104, 156],
+  "taxable_compulsory_amounts": [156],
+  "monthly_tax": {
+    "1": 36,
+    "2": 33,
+    "3": 30,
+    "4": 27,
+    "5": 24,
+    "6": 21,
+    "7": 18,
+    "8": 15,
+    "9": 12,
+    "10": 9,
+    "11": 6,
+    "12": 3
+  }
+}

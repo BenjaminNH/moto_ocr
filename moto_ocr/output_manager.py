@@ -141,9 +141,9 @@ def create_group_excel(group_name, results, date_folder, current_date_str, month
             accident_insurance = 0
         
         commission = calculate_commission(accident_insurance)
-        if accident_insurance == 200:
+        if commission == 30:
             count_30 += 1
-        elif accident_insurance == 300:
+        elif commission == 50:
             count_50 += 1
         total_commission += commission
         
