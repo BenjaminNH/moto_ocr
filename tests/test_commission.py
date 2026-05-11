@@ -32,6 +32,10 @@ class TestMatchPremium:
         result = match_premium(482, month=5)
         assert result == {"compulsory": 156, "accident": 302, "tax": 24}
 
+    def test_match_494_with_historical_tax_on_302_plan(self):
+        result = match_premium(494, month=5)
+        assert result == {"compulsory": 156, "accident": 302, "tax": 36}
+
     def test_match_580_with_tax_on_400_plan(self):
         result = match_premium(580, month=5)
         assert result == {"compulsory": 156, "accident": 400, "tax": 24}

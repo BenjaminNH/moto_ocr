@@ -136,10 +136,18 @@ def _tax_candidates(compulsory_amount, month=None):
     if compulsory_amount not in rules["taxable_compulsory_amounts"]:
         return [0]
 
-    if month is not None:
-        return [0, rules["monthly_tax"].get(month, 0)]
+    all_tax_amounts = list(rules["monthly_tax"].values())
 
-    return [0, *rules["monthly_tax"].values()]
+    if month is not None:
+        preferred_tax = rules["monthly_tax"].get(month, 0)
+        ordered_candidates = [0, preferred_tax]
+        ordered_candidates.extend(
+            tax_amount for tax_amount in all_tax_amounts
+            if tax_amount not in ordered_candidates
+        )
+        return ordered_candidates
+
+    return [0, *all_tax_amounts]
 
 
 def match_premium(total_amount, month=None):
